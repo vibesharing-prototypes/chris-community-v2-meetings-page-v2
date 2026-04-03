@@ -1,14 +1,8 @@
 import { PageHeader } from "@diligentcorp/atlas-react-bundle";
 import AddIcon from "@diligentcorp/atlas-react-bundle/icons/Add";
-import CalendarIcon from "@diligentcorp/atlas-react-bundle/icons/Calendar";
-import CloseIcon from "@diligentcorp/atlas-react-bundle/icons/Close";
 import FilterIcon from "@diligentcorp/atlas-react-bundle/icons/Filter";
-import MoreIcon from "@diligentcorp/atlas-react-bundle/icons/More";
 import SearchIcon from "@diligentcorp/atlas-react-bundle/icons/Search";
-import TemplateIcon from "@diligentcorp/atlas-react-bundle/icons/Document";
-import ArchiveIcon from "@diligentcorp/atlas-react-bundle/icons/Archive";
-import CopyIcon from "@diligentcorp/atlas-react-bundle/icons/Copy";
-import UnarchiveIcon from "@diligentcorp/atlas-react-bundle/icons/Unarchive";
+import SortIcon from "@diligentcorp/atlas-react-bundle/icons/Sort";
 import {
   Accordion,
   AccordionDetails,
@@ -16,33 +10,22 @@ import {
   Alert,
   Badge,
   Box,
+  ToggleButton,
+  ToggleButtonGroup,
   Button,
-  Divider,
   FormControl,
   FormLabel,
-  IconButton,
   InputAdornment,
-  Chip,
   MenuItem,
+  Popover,
   Select,
   Stack,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Tabs,
   TextField,
-  Tooltip,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
   useTheme,
 } from "@mui/material";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useMemo, useState } from "react";
 
 import PageLayout from "../components/PageLayout.js";
@@ -52,7 +35,6 @@ import MeetingRowActions from "../components/meetings/MeetingRowActions";
 import TemplatePickerDialog from "../components/meetings/TemplatePickerDialog";
 import DuplicateMeetingDialog from "../components/meetings/DuplicateMeetingDialog";
 import ConfirmDialog from "../components/meetings/ConfirmDialog";
-import StatusChip from "../components/meetings/StatusChip";
 import type {
   Meeting,
   MeetingStatus,
@@ -60,27 +42,93 @@ import type {
   MeetingTemplate,
   MeetingVisibility,
 } from "../types/meetings";
-import { formatDateLong, getYear, isUpcoming } from "../utils/meetings";
+import { formatDate, formatDateLong, getCountdown, getYear, isUpcoming } from "../utils/meetings";
 import meetingsData from "../data/meetings.json";
 
+function MeetingRow({
+  meeting,
+  onEdit,
+  onPublish,
+  onUnpublish,
+  onDuplicate,
+  onDelete,
+  onClick,
+}: {
+  meeting: Meeting;
+  onEdit: () => void;
+  onPublish: () => void;
+  onUnpublish: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onClick: () => void;
+}) {
+  return (
+    <Box
+      id={`meeting-row-${meeting.id}`}
+      sx={{
+        py: "12px",
+        px: 1,
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        cursor: "pointer",
+        "&:hover": { bgcolor: "action.hover" },
+      }}
+      onClick={onClick}
+    >
+      <Typography sx={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1, mb: "2px" }}>{meeting.name}</Typography>
+      <Stack direction="row" alignItems="baseline">
+        {/* Date + time + countdown */}
+        <Box sx={{ width: "45%", flexShrink: 0 }}>
+          <Typography variant="caption" color="text.secondary">
+            {formatDateLong(meeting.date)}{meeting.time ? ` · ${meeting.time}` : ""}
+            {getCountdown(meeting.date) ? ` · ${getCountdown(meeting.date)}` : ""}
+          </Typography>
+        </Box>
+        {/* Status */}
+        <Box sx={{ width: "15%", flexShrink: 0 }}>
+          <Typography variant="caption" color="text.secondary">
+            {meeting.status === "Published" ? "Published" : "Draft"}
+          </Typography>
+        </Box>
+        {/* Visibility */}
+        <Box sx={{ width: "15%", flexShrink: 0 }}>
+          <Typography variant="caption" color="text.secondary">
+            {meeting.visibility}
+          </Typography>
+        </Box>
+        {/* Actions */}
+        <Box sx={{ marginLeft: "auto", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <MeetingRowActions
+            status={meeting.status}
+            onEdit={onEdit}
+            onPublish={onPublish}
+            onUnpublish={onUnpublish}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+          />
+        </Box>
+      </Stack>
+    </Box>
+  );
+}
+
 export default function MeetingsPage() {
-  const { presets, tokens } = useTheme();
+  const { presets } = useTheme();
   const { meetings: seedMeetings, templates: seedTemplates, committees } = meetingsData as {
     meetings: Meeting[];
     templates: MeetingTemplate[];
     committees: string[];
   };
   const [meetings, setMeetings] = useState<Meeting[]>(seedMeetings);
-  const [templates, setTemplates] = useState<MeetingTemplate[]>(seedTemplates);
+  const [templates] = useState<MeetingTemplate[]>(seedTemplates);
   const [activeTab, setActiveTab] = useState<MeetingTab>("upcoming");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("date-asc");
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [committeeFilter, setCommitteeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<MeetingStatus | "All">("All");
   const [visibilityFilter, setVisibilityFilter] = useState<MeetingVisibility | "All">("All");
-  const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
-  const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
+  const [startDateFilter, setStartDateFilter] = useState("");
+  const [endDateFilter, setEndDateFilter] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -89,6 +137,7 @@ export default function MeetingsPage() {
   const [detailView, setDetailView] = useState<Meeting | null>(null);
   const [editView, setEditView] = useState<Meeting | null>(null);
   const [createTemplateId, setCreateTemplateId] = useState<string | null>(null);
+  const [filterAnchor, setFilterAnchor] = useState<HTMLElement | null>(null);
 
   const filteredMeetings = useMemo(() => {
     return meetings
@@ -100,8 +149,8 @@ export default function MeetingsPage() {
         visibilityFilter === "All" ? true : meeting.visibility === visibilityFilter,
       )
       .filter((meeting) => (!committeeFilter ? true : meeting.committee === committeeFilter))
-      .filter((meeting) => (!startDateFilter ? true : meeting.date >= startDateFilter.toISOString().slice(0, 10)))
-      .filter((meeting) => (!endDateFilter ? true : meeting.date <= endDateFilter.toISOString().slice(0, 10)));
+      .filter((meeting) => (!startDateFilter ? true : meeting.date >= startDateFilter))
+      .filter((meeting) => (!endDateFilter ? true : meeting.date <= endDateFilter));
   }, [meetings, search, statusFilter, visibilityFilter, committeeFilter, startDateFilter, endDateFilter]);
 
   const sortedMeetings = useMemo(() => {
@@ -119,6 +168,23 @@ export default function MeetingsPage() {
   );
 
   const visibleTemplates = showArchived ? templates : templates.filter((t) => t.status === "Active");
+
+  const activeFilterCount = [
+    committeeFilter,
+    statusFilter !== "All" ? statusFilter : "",
+    visibilityFilter !== "All" ? visibilityFilter : "",
+    startDateFilter,
+    endDateFilter,
+  ].filter(Boolean).length;
+
+  const meetingRowHandlers = (meeting: Meeting) => ({
+    onEdit: () => setEditView(meeting),
+    onPublish: () => setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? { ...m, status: "Published" as const } : m))),
+    onUnpublish: () => setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? { ...m, status: "Draft" as const } : m))),
+    onDuplicate: () => { setDuplicateSource(meeting); setDuplicateDialogOpen(true); },
+    onDelete: () => setDeleteTarget(meeting),
+    onClick: () => setDetailView(meeting),
+  });
 
   if (detailView) {
     return (
@@ -161,32 +227,54 @@ export default function MeetingsPage() {
 
   return (
     <PageLayout id="page-meetings">
-      <PageHeader pageTitle="Meetings" />
-
-      <Tabs
-        value={activeTab}
-        onChange={(_, value) => setActiveTab(value)}
-        sx={{
-          "& .MuiTab-root:not(.Mui-selected)::after": { display: "none" },
-          borderBottom: `1px solid ${tokens?.component?.divider?.colors?.default?.borderColor?.value}`,
-          ...presets?.TabsPresets?.Tabs?.alignToPageHeader?.sx,
-          mt: -1,
-        }}
-      >
-        <Tab label="Upcoming" value="upcoming" />
-        <Tab label="Previous" value="previous" />
-        <Tab label="Templates" value="templates" />
-      </Tabs>
+      <PageHeader
+        pageTitle="Meetings"
+        moreButton={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setCreateDialogOpen(true)}
+          >
+            {activeTab === "templates" ? "New template" : "New meeting"}
+          </Button>
+        }
+      />
 
       <Stack gap={2} id="meetings-content">
-        <Box id="meetings-toolbar" sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", width: "100%" }}>
-          <Stack direction="row" spacing={2} alignItems="flex-end">
-            <FormControl sx={{ minWidth: 240 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, value) => setActiveTab(value)}
+          {...presets?.TabsPresets?.Tabs?.alignToPageHeader}
+        >
+          <Tab label="Upcoming" value="upcoming" />
+          <Tab label="Previous" value="previous" />
+          <Tab label="Templates" value="templates" />
+        </Tabs>
+
+        {/* Toolbar — search, sort, filters in a recessed bar */}
+        <Box
+          sx={{
+            bgcolor: "action.hover",
+            borderRadius: 1,
+            px: 2,
+            py: 1.5,
+          }}
+          id="meetings-toolbar"
+        >
+        {activeTab !== "templates" ? (
+          <>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="flex-end"
+          >
+            <FormControl sx={{ flex: 1 }}>
               <FormLabel>Search</FormLabel>
               <TextField
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search meetings"
+                placeholder="Search..."
+
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -198,408 +286,249 @@ export default function MeetingsPage() {
                 }}
               />
             </FormControl>
-
-            {activeTab !== "templates" && (
-              <>
-                <FormControl sx={{ minWidth: 240 }}>
-                  <FormLabel>Sort by</FormLabel>
-                  <Select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
-                    <MenuItem value="date-asc">Meeting date ascending</MenuItem>
-                    <MenuItem value="date-desc">Meeting date descending</MenuItem>
-                  </Select>
-                </FormControl>
-                <Button
-                  variant="text"
-                  startIcon={<FilterIcon />}
-                  onClick={() => setFilterPanelOpen(true)}
-                >
-                  Filters
-                  <Badge
-                    color="primary"
-                    badgeContent={[
-                      committeeFilter,
-                      statusFilter !== "All" ? statusFilter : "",
-                      visibilityFilter !== "All" ? visibilityFilter : "",
-                      startDateFilter,
-                      endDateFilter,
-                    ].filter((v) => v !== null && v !== "").length}
-                    sx={{ ml: 1 }}
-                  />
-                </Button>
-              </>
-            )}
-
-            {activeTab === "templates" && (
-              <FormControl sx={{ minWidth: 200 }}>
-                <FormLabel>Show archived</FormLabel>
-                <Select
-                  value={showArchived ? "yes" : "no"}
-                  onChange={(event) => setShowArchived(event.target.value === "yes")}
-                >
-                  <MenuItem value="no">Active only</MenuItem>
-                  <MenuItem value="yes">Active + archived</MenuItem>
-                </Select>
-              </FormControl>
+            <ToggleButtonGroup
+              value={sortBy}
+              exclusive
+              onChange={(_, value) => { if (value) setSortBy(value); }}
+              size="small"
+              sx={{
+                "& .MuiToggleButton-root": { fontSize: "0.8125rem", textTransform: "none" },
+                "& .MuiToggleButton-root.Mui-selected": { color: "#fff", "&:hover": { color: "#fff" } },
+              }}
+            >
+              <ToggleButton value="date-asc">Oldest first</ToggleButton>
+              <ToggleButton value="date-desc">Newest first</ToggleButton>
+            </ToggleButtonGroup>
+            <Badge badgeContent={activeFilterCount} color="primary">
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<FilterIcon />}
+                onClick={(e) => setFilterAnchor(e.currentTarget)}
+                sx={{ fontSize: "0.8125rem" }}
+              >
+                Filters
+              </Button>
+            </Badge>
+            {activeFilterCount > 0 && (
+              <Button
+                variant="text"
+                onClick={() => {
+                  setCommitteeFilter("");
+                  setStatusFilter("All");
+                  setVisibilityFilter("All");
+                  setStartDateFilter("");
+                  setEndDateFilter("");
+                }}
+              >
+                Clear
+              </Button>
             )}
           </Stack>
-
-          <Button
-            variant="contained"
-            size="medium"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateDialogOpen(true)}
-            sx={{ whiteSpace: "nowrap" }}
+          <Popover
+            open={Boolean(filterAnchor)}
+            anchorEl={filterAnchor}
+            onClose={() => setFilterAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            transformOrigin={{ vertical: "top", horizontal: "left" }}
+            slotProps={{ paper: { sx: { p: 3, minWidth: 280 } } }}
           >
-            {activeTab === "templates" ? "New template" : "New meeting"}
-          </Button>
+            <Stack spacing={2}>
+              <FormControl fullWidth>
+                <FormLabel>Committee</FormLabel>
+                <Select
+                  value={committeeFilter}
+                  onChange={(event) => setCommitteeFilter(event.target.value)}
+                  displayEmpty
+                >
+                  <MenuItem value="">All</MenuItem>
+                  {committees.map((value) => (
+                    <MenuItem key={value} value={value}>{value}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <FormLabel>Status</FormLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as MeetingStatus | "All")}
+                >
+                  <MenuItem value="All">All</MenuItem>
+                  <MenuItem value="Published">Published</MenuItem>
+                  <MenuItem value="Draft">Draft</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <FormLabel>Visibility</FormLabel>
+                <Select
+                  value={visibilityFilter}
+                  onChange={(event) => setVisibilityFilter(event.target.value as MeetingVisibility | "All")}
+                >
+                  <MenuItem value="All">All</MenuItem>
+                  <MenuItem value="Public">Public</MenuItem>
+                  <MenuItem value="Internal">Internal</MenuItem>
+                </Select>
+              </FormControl>
+              <Stack direction="row" spacing={1.5}>
+                <FormControl fullWidth>
+                  <FormLabel>From</FormLabel>
+                  <TextField type="date" size="small" value={startDateFilter} onChange={(event) => setStartDateFilter(event.target.value)} />
+                </FormControl>
+                <FormControl fullWidth>
+                  <FormLabel>To</FormLabel>
+                  <TextField type="date" size="small" value={endDateFilter} onChange={(event) => setEndDateFilter(event.target.value)} />
+                </FormControl>
+              </Stack>
+            </Stack>
+          </Popover>
+          </>
+        ) : (
+          <Stack direction="row" spacing={1.5} alignItems="flex-end">
+            <FormControl sx={{ minWidth: 180 }}>
+              <FormLabel>Search</FormLabel>
+              <TextField
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search..."
+                
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </FormControl>
+            <FormControl sx={{ minWidth: 180 }}>
+              <FormLabel>Show archived</FormLabel>
+              <Select
+                value={showArchived ? "yes" : "no"}
+                onChange={(event) => setShowArchived(event.target.value === "yes")}
+              >
+                <MenuItem value="no">Active only</MenuItem>
+                <MenuItem value="yes">Active + archived</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        )}
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "flex-start" }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-
+        {/* Upcoming tab */}
         {activeTab === "upcoming" && (
-          <Stack id="meetings-upcoming-list">
+          <Box id="meetings-upcoming-list">
             {upcomingMeetings.length === 0 ? (
               <Alert severity="info">No upcoming meetings</Alert>
             ) : (
-              upcomingMeetings.map((meeting, index) => (
-                <Box
+              upcomingMeetings.map((meeting) => (
+                <MeetingRow
                   key={meeting.id}
-                  id={`meeting-row-${meeting.id}`}
-                  sx={{
-                    borderBottom: index < upcomingMeetings.length - 1 ? `1px solid ${tokens?.component?.divider?.colors?.default?.borderColor?.value}` : "none",
-                    py: 2,
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <Stack flex={1} gap={0.5}>
-                    <Typography variant="subtitle2">{meeting.name}</Typography>
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <Box sx={{ display: "flex", alignItems: "center", width: 20, height: 20, mr: "4px", color: "text.secondary", flexShrink: 0 }}>
-                        <CalendarIcon />
-                      </Box>
-                      <Typography variant="caption" color="text.secondary" sx={{ mr: "12px" }}>
-                        {formatDateLong(meeting.date)} · {meeting.time ?? "Time TBD"}
-                      </Typography>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        {meeting.status === "Draft" ? (
-                          <StatusChip label="Draft" />
-                        ) : (
-                          <>
-                            <StatusChip label="Published" />
-                            <StatusChip label={meeting.visibility} />
-                          </>
-                        )}
-                      </Stack>
-                    </Box>
-                  </Stack>
-                  <MeetingRowActions
-                    status={meeting.status}
-                    onPublish={() => setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? { ...m, status: "Published" } : m)))}
-                    onUnpublish={() => setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? { ...m, status: "Draft" } : m)))}
-                    onDuplicate={() => { setDuplicateSource(meeting); setDuplicateDialogOpen(true); }}
-                    onDelete={() => setDeleteTarget(meeting)}
-                  />
-                </Box>
+                  meeting={meeting}
+                  {...meetingRowHandlers(meeting)}
+                />
               ))
             )}
-          </Stack>
+          </Box>
         )}
 
+        {/* Previous tab */}
         {activeTab === "previous" && (
           <Stack gap={2} id="meetings-previous-accordion">
-            {previousYears.map((year, index) => {
-              const yearMeetings = previousMeetings.filter((meeting) => getYear(meeting.date) === year);
-              return (
-                <Accordion key={year} defaultExpanded={index === 0} id={`meetings-year-${year}`} sx={{ "&::before": { display: "none" } }}>
-                  <AccordionSummary>
-                    <Typography variant="subtitle2">
-                      {year}{" "}
-                      <Box component="span" sx={{ fontWeight: 400 }}>({yearMeetings.length})</Box>
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Stack id={`meetings-year-${year}-list`}>
-                      {yearMeetings.map((meeting, meetingIndex) => (
-                        <Box
+            {previousYears.map((year) => (
+              <Accordion key={year} defaultExpanded id={`meetings-year-${year}`}>
+                <AccordionSummary>
+                  <Typography variant="subtitle2">{year}</Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Box id={`meetings-year-${year}-list`}>
+                    {previousMeetings
+                      .filter((meeting) => getYear(meeting.date) === year)
+                      .map((meeting) => (
+                        <MeetingRow
                           key={meeting.id}
-                          id={`meeting-row-${meeting.id}`}
-                          sx={{
-                            borderBottom: meetingIndex < yearMeetings.length - 1 ? `1px solid ${tokens?.component?.divider?.colors?.default?.borderColor?.value}` : "none",
-                            py: 2,
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Stack flex={1} gap={0.5}>
-                            <Typography variant="subtitle2">{meeting.name}</Typography>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <Box sx={{ display: "flex", alignItems: "center", width: 20, height: 20, mr: "4px", color: "text.secondary", flexShrink: 0 }}>
-                                <CalendarIcon />
-                              </Box>
-                              <Typography variant="caption" color="text.secondary" sx={{ mr: "12px" }}>
-                                {formatDateLong(meeting.date)} · {meeting.time ?? "Time TBD"}
-                              </Typography>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                {meeting.status === "Draft" ? (
-                                  <StatusChip label="Draft" />
-                                ) : (
-                                  <>
-                                    <StatusChip label="Published" />
-                                    <StatusChip label={meeting.visibility} />
-                                  </>
-                                )}
-                              </Stack>
-                            </Box>
-                          </Stack>
-                          <MeetingRowActions
-                            status={meeting.status}
-                            onPublish={() => setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? { ...m, status: "Published" } : m)))}
-                            onUnpublish={() => setMeetings((prev) => prev.map((m) => (m.id === meeting.id ? { ...m, status: "Draft" } : m)))}
-                            onDuplicate={() => { setDuplicateSource(meeting); setDuplicateDialogOpen(true); }}
-                            onDelete={() => setDeleteTarget(meeting)}
-                          />
-                        </Box>
+                          meeting={meeting}
+                          {...meetingRowHandlers(meeting)}
+                        />
                       ))}
-                    </Stack>
-                  </AccordionDetails>
-                </Accordion>
-              );
-            })}
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
+            ))}
           </Stack>
         )}
 
+        {/* Templates tab */}
         {activeTab === "templates" && (
-          <Box
-            sx={{
-              width: "100%",
-              border: `1px solid ${tokens?.component?.divider?.colors?.default?.borderColor?.value}`,
-              borderRadius: "12px",
-              overflow: "hidden",
-            }}
-          >
-            <Table
-              id="meetings-templates-table"
-              sx={{
-                width: "100%",
-                "& .MuiTableBody-root .MuiTableRow-root:last-child .MuiTableCell-root": { borderBottom: 0 },
-              }}
-            >
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Committee</TableCell>
-                  <TableCell>Time</TableCell>
-                  <TableCell>Location</TableCell>
-                  <TableCell align="right" />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {visibleTemplates.map((template) => (
-                  <TableRow key={template.id} id={`template-row-${template.id}`}>
-                    <TableCell>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{template.name}</Typography>
-                        {template.status === "Archived" && <StatusChip label="Archived" />}
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          border: "1px solid #76777A",
-                          borderRadius: "100px",
-                          px: 1.5,
-                          height: 24,
-                          fontSize: 12,
-                          lineHeight: 1,
-                          whiteSpace: "nowrap",
-                        }}
+          <Box id="meetings-templates-list">
+            {visibleTemplates.map((template) => (
+              <Box
+                key={template.id}
+                id={`template-row-${template.id}`}
+                sx={{
+                  py: 2,
+                  px: 1,
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Stack flex={1} spacing={0.25}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{template.name}</Typography>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "primary.main", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
                       >
-                        {template.committee}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{template.time ?? "—"}</TableCell>
-                    <TableCell>{template.location ?? "—"}</TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                        <Tooltip title="Duplicate">
-                          <IconButton size="medium" aria-label="Duplicate template">
-                            <CopyIcon />
-                          </IconButton>
-                        </Tooltip>
-                        {template.status === "Archived" ? (
-                          <Tooltip title="Unarchive">
-                            <IconButton
-                              size="medium"
-                              aria-label="Unarchive template"
-                              onClick={() => setTemplates((prev) => prev.map((t) => t.id === template.id ? { ...t, status: "Active" as const } : t))}
-                            >
-                              <UnarchiveIcon />
-                            </IconButton>
-                          </Tooltip>
-                        ) : (
-                          <Tooltip title="Archive">
-                            <IconButton
-                              size="medium"
-                              aria-label="Archive template"
-                              onClick={() => setTemplates((prev) => prev.map((t) => t.id === template.id ? { ...t, status: "Archived" as const } : t))}
-                            >
-                              <ArchiveIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        Used {template.meetingsCreated} time{template.meetingsCreated !== 1 ? "s" : ""}
+                      </Typography>
+                      {template.lastUsed && (
+                        <>
+                          <Typography variant="caption" color="text.disabled" sx={{ px: 1 }}>|</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Last used: {formatDate(template.lastUsed)}
+                            {template.lastMeetingName && (
+                              <>
+                                {" — "}
+                                <Typography
+                                  component="span"
+                                  variant="caption"
+                                  sx={{ color: "primary.main", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                                >
+                                  {template.lastMeetingName}
+                                </Typography>
+                              </>
+                            )}
+                          </Typography>
+                        </>
+                      )}
+                      <Typography variant="caption" color="text.disabled" sx={{ px: 1 }}>|</Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "primary.main", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                      >
+                        Preview template
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                  <MeetingRowActions
+                    status="Draft"
+                    onEdit={() => {}}
+                    onPublish={() => {}}
+                    onUnpublish={() => {}}
+                    onDuplicate={() => {}}
+                    onDelete={() => {}}
+                  />
+                </Stack>
+              </Box>
+            ))}
           </Box>
         )}
-          </Box>
-
-          {/* Inline filter panel */}
-          <Box
-            sx={{
-              width: filterPanelOpen ? 300 : 0,
-              ml: filterPanelOpen ? 3 : 0,
-              overflow: "hidden",
-              flexShrink: 0,
-              transition: "width 225ms cubic-bezier(0.4, 0, 0.2, 1), margin-left 225ms cubic-bezier(0.4, 0, 0.2, 1)",
-              position: "sticky",
-              top: 16,
-              alignSelf: "flex-start",
-            }}
-          >
-            <Box
-              id="meetings-filter-content"
-              sx={{
-                width: 300,
-                border: `1px solid ${tokens?.component?.divider?.colors?.default?.borderColor?.value}`,
-                borderRadius: "12px",
-                bgcolor: "#ffffff",
-                display: "flex",
-                flexDirection: "column",
-                maxHeight: "calc(100vh - 120px)",
-                overflow: "hidden",
-              }}
-            >
-              {/* Header */}
-              <Box sx={{ px: 2, pt: 2, pb: 3, flexShrink: 0 }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h4" sx={{ fontSize: 18, fontWeight: 600 }}>Filters</Typography>
-                  <IconButton size="small" aria-label="Close filters" onClick={() => setFilterPanelOpen(false)}>
-                    <CloseIcon />
-                  </IconButton>
-                </Stack>
-              </Box>
-
-              {/* Scrollable content */}
-              <Box sx={{ flex: 1, overflowY: "auto", px: 2, pb: 3 }}>
-                <Stack gap={2}>
-                  <FormControl>
-                    <FormLabel>
-                      Committee{" "}
-                      <Box component="span" sx={{ fontWeight: 400 }}>(Required)</Box>
-                    </FormLabel>
-                    <Select
-                      value={committeeFilter}
-                      onChange={(event) => setCommitteeFilter(event.target.value)}
-                      displayEmpty
-                    >
-                      <MenuItem value="">All committees</MenuItem>
-                      {committees.map((value) => (
-                        <MenuItem key={value} value={value}>
-                          {value}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>State</FormLabel>
-                    <ToggleButtonGroup
-                      exclusive
-                      size="small"
-                      value={statusFilter}
-                      onChange={(_, value) => {
-                        if (value) setStatusFilter(value as MeetingStatus | "All");
-                      }}
-                    >
-                      <ToggleButton value="All">All</ToggleButton>
-                      <ToggleButton value="Published">Published</ToggleButton>
-                      <ToggleButton value="Draft">Draft</ToggleButton>
-                    </ToggleButtonGroup>
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>Visibility</FormLabel>
-                    <ToggleButtonGroup
-                      exclusive
-                      size="small"
-                      value={visibilityFilter}
-                      onChange={(_, value) => {
-                        if (value) setVisibilityFilter(value as MeetingVisibility | "All");
-                      }}
-                    >
-                      <ToggleButton value="All">All</ToggleButton>
-                      <ToggleButton value="Public">Public</ToggleButton>
-                      <ToggleButton value="Internal">Internal</ToggleButton>
-                    </ToggleButtonGroup>
-                  </FormControl>
-                  <FormControl>
-                    <Typography variant="body2" sx={{ mb: 1, color: "#6F7377" }}>
-                      Show meetings within the time frame you select below:
-                    </Typography>
-                    <LocalizationProvider dateAdapter={AdapterDateFns}>
-                      <Stack spacing={1}>
-                        <Stack spacing={0.5}>
-                          <FormLabel>Start date</FormLabel>
-                          <DatePicker
-                            value={startDateFilter}
-                            onChange={(value) => setStartDateFilter(value)}
-                            slotProps={{ textField: { size: "small" } }}
-                          />
-                        </Stack>
-                        <Stack spacing={0.5}>
-                          <FormLabel>End date</FormLabel>
-                          <DatePicker
-                            value={endDateFilter}
-                            onChange={(value) => setEndDateFilter(value)}
-                            slotProps={{ textField: { size: "small" } }}
-                          />
-                        </Stack>
-                      </Stack>
-                    </LocalizationProvider>
-                  </FormControl>
-                </Stack>
-              </Box>
-
-              {/* Sticky footer */}
-              <Box sx={{ flexShrink: 0 }}>
-                <Divider />
-                <Box sx={{ px: 2, py: 1.5, display: "flex", justifyContent: "flex-end" }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      setCommitteeFilter("");
-                      setStatusFilter("All");
-                      setVisibilityFilter("All");
-                      setStartDateFilter(null);
-                      setEndDateFilter(null);
-                    }}
-                  >
-                    Clear all
-                  </Button>
-                </Box>
-              </Box>
-            </Box>
-          </Box>
-        </Box>
       </Stack>
+
 
       <TemplatePickerDialog
         open={createDialogOpen}
@@ -622,7 +551,7 @@ export default function MeetingsPage() {
         title="Delete meeting?"
         message={
           deleteTarget
-            ? `Delete “${deleteTarget.name}”? This action cannot be undone.`
+            ? `Delete "${deleteTarget.name}"? This action cannot be undone.`
             : ""
         }
         confirmLabel="Delete"

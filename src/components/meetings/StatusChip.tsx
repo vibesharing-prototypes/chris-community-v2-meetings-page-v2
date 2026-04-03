@@ -1,20 +1,25 @@
-import { useTheme } from "@mui/material";
-
-const MUTED = { backgroundColor: "#F3F3F3", color: "#515255" };
-const PUBLISHED = { backgroundColor: "#E4F3FF", color: "#004C6C" };
+import StatusPill from "../common/StatusPill";
 
 export default function StatusChip({ label }: { label: string }) {
-  const { presets } = useTheme();
-  const StatusIndicator = presets.StatusIndicatorPresets?.components.StatusIndicator;
-  if (!StatusIndicator) return null;
+  const color = (() => {
+    switch (label) {
+      case "Draft":
+      case "Archived":
+      case "Not published":
+        return "subtle";
+      case "Published":
+      case "Active":
+        return "success";
+      case "Public":
+        return "information";
+      case "Internal":
+        return "generic";
+      case "Out of sync":
+        return "warning";
+      default:
+        return "generic";
+    }
+  })();
 
-  const customColor = label === "Published" ? PUBLISHED : MUTED;
-
-  return (
-    <StatusIndicator
-      label={label}
-      customColor={customColor}
-      sx={{ boxShadow: "0 0 0 1px #FFFFFF", "& .MuiChip-label": { display: "flex", alignItems: "center", lineHeight: 1, fontWeight: 600 } }}
-    />
-  );
+  return <StatusPill label={label} color={color} />;
 }
