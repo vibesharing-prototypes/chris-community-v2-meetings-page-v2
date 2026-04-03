@@ -2,7 +2,6 @@ import { PageHeader } from "@diligentcorp/atlas-react-bundle";
 import AddIcon from "@diligentcorp/atlas-react-bundle/icons/Add";
 import FilterIcon from "@diligentcorp/atlas-react-bundle/icons/Filter";
 import SearchIcon from "@diligentcorp/atlas-react-bundle/icons/Search";
-import SortIcon from "@diligentcorp/atlas-react-bundle/icons/Sort";
 import {
   Accordion,
   AccordionDetails,
