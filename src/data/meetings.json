@@ -120,6 +120,81 @@
       "agendaItems": 7,
       "membersOnly": false,
       "publicRTS": false
+    },
+    {
+      "id": "m9",
+      "name": "Regular board meeting",
+      "date": "2025-12-16",
+      "time": "6:00 PM",
+      "location": "District office · Board room",
+      "committee": "Regular board",
+      "status": "Published",
+      "visibility": "Public",
+      "agendaStatus": "Published",
+      "agendaCategories": 5,
+      "agendaItems": 20,
+      "membersOnly": false,
+      "publicRTS": true
+    },
+    {
+      "id": "m10",
+      "name": "Finance committee",
+      "date": "2025-11-19",
+      "time": "5:30 PM",
+      "location": "District office · Room 204",
+      "committee": "Finance",
+      "status": "Published",
+      "visibility": "Internal",
+      "agendaStatus": "Published",
+      "agendaCategories": 2,
+      "agendaItems": 9,
+      "membersOnly": false,
+      "publicRTS": false
+    },
+    {
+      "id": "m11",
+      "name": "Audit committee",
+      "date": "2025-10-14",
+      "time": "3:00 PM",
+      "location": "District office · Room 101",
+      "committee": "Audit",
+      "status": "Published",
+      "visibility": "Internal",
+      "agendaStatus": "Published",
+      "agendaCategories": 3,
+      "agendaItems": 11,
+      "membersOnly": false,
+      "publicRTS": false
+    },
+    {
+      "id": "m12",
+      "name": "Regular board meeting",
+      "date": "2025-09-16",
+      "time": "6:00 PM",
+      "location": "District office · Board room",
+      "committee": "Regular board",
+      "status": "Published",
+      "visibility": "Public",
+      "agendaStatus": "Published",
+      "agendaCategories": 4,
+      "agendaItems": 16,
+      "membersOnly": false,
+      "publicRTS": true
+    },
+    {
+      "id": "m13",
+      "name": "Budget workshop",
+      "date": "2025-08-20",
+      "time": "9:00 AM",
+      "location": "District office · Board room",
+      "committee": "Finance",
+      "status": "Published",
+      "visibility": "Public",
+      "agendaStatus": "Published",
+      "agendaCategories": 2,
+      "agendaItems": 6,
+      "membersOnly": false,
+      "publicRTS": false
     }
   ],
   "templates": [
@@ -130,11 +205,7 @@
       "time": "6:00 PM",
       "location": "District office · Board room",
       "status": "Active",
-      "meetingsCreated": 24,
-      "lastUsed": "2026-03-18",
-      "lastMeetingName": "March Board Meeting",
-      "agendaCategories": 5,
-      "agendaItems": 14
+      "meetingsCreated": 24
     },
     {
       "id": "t2",
@@ -143,11 +214,7 @@
       "time": "5:30 PM",
       "location": "District office · Room 204",
       "status": "Active",
-      "meetingsCreated": 12,
-      "lastUsed": "2026-02-25",
-      "lastMeetingName": "February Finance Review",
-      "agendaCategories": 2,
-      "agendaItems": 8
+      "meetingsCreated": 12
     },
     {
       "id": "t3",
@@ -156,22 +223,14 @@
       "time": "3:00 PM",
       "location": "District office · Room 101",
       "status": "Active",
-      "meetingsCreated": 8,
-      "lastUsed": "2026-03-10",
-      "lastMeetingName": "Q1 Audit Review",
-      "agendaCategories": 3,
-      "agendaItems": 10
+      "meetingsCreated": 8
     },
     {
       "id": "t4",
       "name": "Special session",
       "committee": "Regular board",
       "status": "Archived",
-      "meetingsCreated": 3,
-      "lastUsed": "2025-11-15",
-      "lastMeetingName": "November Special Session",
-      "agendaCategories": 1,
-      "agendaItems": 4
+      "meetingsCreated": 3
     }
   ],
   "committees": ["Regular board", "Finance", "Audit"]
